@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/genuinetools/reg/registry"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 type registryController struct {
@@ -190,33 +192,63 @@ func (rc *registryController) generateTagsTemplate(ctx context.Context, repo str
 		UpdateInterval: rc.interval,
 		Name:           repo,
 		HasVulns:       hasVulns, // if we have a clair client we can return vulns
+		Repositories:   make([]Repository, len(tags)),
 	}
 
-	for _, tag := range tags {
-		rp := Repository{
-			Name: repo,
-			Tag:  tag,
-		}
+	eg, ctx := errgroup.WithContext(ctx)
 
-		m2, err := rc.reg.ManifestV2(ctx, repo, tag)
-		if err != nil {
-			return nil, fmt.Errorf("getting v2 manifest for %s:%s failed: %v", repo, tag, err)
-		}
-		var size float64
-		for _, layer := range m2.Layers {
-			size += float64(layer.Size)
-		}
+	for i, tag := range tags {
+		eg.Go(func() error {
+			rp := Repository{
+				Name: repo,
+				Tag:  tag,
+			}
 
-		rp.Size = units.BytesSize(size)
+			m2, err := rc.reg.ManifestV2(ctx, repo, tag)
+			if err != nil {
+				return fmt.Errorf("getting v2 manifest for %s:%s failed: %v", repo, tag, err)
+			}
+			var size float64
+			for _, layer := range m2.Layers {
+				size += float64(layer.Size)
+			}
 
-		repoURI := fmt.Sprintf("%s/%s", rc.reg.Domain, repo)
-		if tag != "latest" {
-			repoURI += ":" + tag
-		}
-		rp.URI = repoURI
+			rp.Size = units.BytesSize(size)
 
-		result.Repositories = append(result.Repositories, rp)
+			blob, err := rc.reg.Blobs(ctx, repo, string(m2.Config.Digest))
+			if err == nil {
+				if blob.Created != nil {
+					rp.Created = *blob.Created
+				}
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"err": err,
+				}).Error("Error fetching blob")
+			}
+
+			repoURI := fmt.Sprintf("%s/%s", rc.reg.Domain, repo)
+			if tag != "latest" {
+				repoURI += ":" + tag
+			}
+			rp.URI = repoURI
+
+			result.Repositories[i] = rp
+
+			return nil
+		})
 	}
+
+	eg.Wait()
+
+	slices.SortFunc(result.Repositories, func(a, b Repository) int {
+		if a.Created.After(b.Created) {
+			return -1
+		} else if a.Created.Before(b.Created) {
+			return 1
+		} else {
+			return 0
+		}
+	})
 
 	// Execute the template.
 	var buf bytes.Buffer

@@ -18,6 +18,7 @@ require (
 	github.com/peterhellberg/link v1.0.0
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749
 	github.com/sirupsen/logrus v1.4.2
+	golang.org/x/sync v0.25.0
 	google.golang.org/grpc v1.23.1
 )
 

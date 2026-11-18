@@ -81,7 +81,7 @@ func (cmd *listCommand) Run(ctx context.Context, args []string) error {
 
 	// Sort the repos.
 	for _, repo := range repos {
-		w.Write([]byte(fmt.Sprintf("%s\t%s\n", repo, strings.Join(repoTags[repo], ", "))))
+		fmt.Fprintf(w, "%s\t%s\n", repo, strings.Join(repoTags[repo], ", "))
 	}
 
 	w.Flush()

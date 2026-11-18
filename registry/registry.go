@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/docker/distribution/manifest/manifestlist"
+	"github.com/docker/distribution/manifest/ocischema"
 	"github.com/docker/distribution/manifest/schema2"
 	"github.com/docker/docker/api/types"
 )
@@ -154,6 +155,8 @@ func (r *Registry) getJSON(ctx context.Context, url string, response interface{}
 		req.Header.Add("Accept", schema2.MediaTypeManifest)
 	case *manifestlist.ManifestList:
 		req.Header.Add("Accept", manifestlist.MediaTypeManifestList)
+	case *ocischema.Manifest:
+		req.Header.Add("Accept", ocischema.SchemaVersion.MediaType)
 	}
 
 	resp, err := r.Client.Do(req.WithContext(ctx))
@@ -161,7 +164,7 @@ func (r *Registry) getJSON(ctx context.Context, url string, response interface{}
 		return nil, err
 	}
 	defer resp.Body.Close()
-	r.Logf("registry.registry resp.Status=%s", resp.Status)
+	r.Logf("registry.registry resp.Status=%s url=%s", resp.Status, url)
 
 	if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
 		return nil, err
