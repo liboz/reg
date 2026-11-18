@@ -166,6 +166,10 @@ func (r *Registry) getJSON(ctx context.Context, url string, response interface{}
 	defer resp.Body.Close()
 	r.Logf("registry.registry resp.Status=%s url=%s", resp.Status, url)
 
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("non-200 return status=%s", resp.Status)
+	}
+
 	if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
 		return nil, err
 	}

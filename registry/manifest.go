@@ -84,6 +84,11 @@ func (r *Registry) ManifestV2(ctx context.Context, repository, ref string) (ocis
 
 	if _, err := r.getJSON(ctx, uri, &m); err != nil {
 		r.Logf("registry.manifests response=%v", m)
+		r.Logf("registry.manifests with oci image uri=%s repository=%s ref=%s", uri, repository, ref)
+		if _, err := r.getJSON(ctx, uri, &oci); err == nil {
+			r.Logf("registry.manifests response=%v", m)
+			return oci, nil
+		}
 		return ocischema.Manifest{}, err
 	}
 
