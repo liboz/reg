@@ -31,11 +31,6 @@ type registryController struct {
 	generateOnly bool
 }
 
-type v1Compatibility struct {
-	ID      string    `json:"id"`
-	Created time.Time `json:"created"`
-}
-
 // A Repository holds data after a vulnerability scan of a single repo
 type Repository struct {
 	Name                string                    `json:"name"`
@@ -203,58 +198,22 @@ func (rc *registryController) generateTagsTemplate(ctx context.Context, repo str
 			Tag:  tag,
 		}
 
-		ch := make(chan error)
-		go func() {
-			// get the manifest
-			m1, err := rc.reg.ManifestV1(ctx, repo, tag)
-			if err != nil {
-				ch <- fmt.Errorf("getting v1 manifest for %s:%s failed: %v", repo, tag, err)
-				return
-			}
+		m2, err := rc.reg.ManifestV2(ctx, repo, tag)
+		if err != nil {
+			return nil, fmt.Errorf("getting v2 manifest for %s:%s failed: %v", repo, tag, err)
+		}
+		var size float64
+		for _, layer := range m2.Layers {
+			size += float64(layer.Size)
+		}
 
-			var createdDate time.Time
-			for _, h := range m1.History {
-				var comp v1Compatibility
-
-				if err := json.Unmarshal([]byte(h.V1Compatibility), &comp); err != nil {
-					ch <- fmt.Errorf("unmarshal v1 manifest for %s:%s failed: %v", repo, tag, err)
-					return
-				}
-
-				createdDate = comp.Created
-				break
-			}
-			rp.Created = createdDate
-			ch <- nil
-		}()
-
-		go func() {
-			m2, err := rc.reg.ManifestV2(ctx, repo, tag)
-			if err != nil {
-				ch <- fmt.Errorf("getting v2 manifest for %s:%s failed: %v", repo, tag, err)
-				return
-			}
-			var size float64
-			for _, layer := range m2.Layers {
-				size += float64(layer.Size)
-			}
-
-			rp.Size = units.BytesSize(size)
-			ch <- nil
-		}()
+		rp.Size = units.BytesSize(size)
 
 		repoURI := fmt.Sprintf("%s/%s", rc.reg.Domain, repo)
 		if tag != "latest" {
 			repoURI += ":" + tag
 		}
 		rp.URI = repoURI
-
-		for i := 0; i < 2; i++ {
-			err := <-ch
-			if err != nil {
-				return nil, err
-			}
-		}
 
 		result.Repositories = append(result.Repositories, rp)
 	}

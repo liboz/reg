@@ -18,11 +18,9 @@ func (cmd *manifestCommand) LongHelp() string  { return manifestHelp }
 func (cmd *manifestCommand) Hidden() bool      { return false }
 
 func (cmd *manifestCommand) Register(fs *flag.FlagSet) {
-	fs.BoolVar(&cmd.v1, "v1", false, "force the version of the manifest retrieved to v1")
 }
 
 type manifestCommand struct {
-	v1 bool
 }
 
 func (cmd *manifestCommand) Run(ctx context.Context, args []string) error {
@@ -42,18 +40,10 @@ func (cmd *manifestCommand) Run(ctx context.Context, args []string) error {
 	}
 
 	var manifest interface{}
-	if cmd.v1 {
-		// Get the v1 manifest if it was explicitly asked for.
-		manifest, err = r.ManifestV1(ctx, image.Path, image.Reference())
-		if err != nil {
-			return err
-		}
-	} else {
-		// Get the v2 manifest.
-		manifest, err = r.Manifest(ctx, image.Path, image.Reference())
-		if err != nil {
-			return err
-		}
+	// Get the v2 manifest.
+	manifest, err = r.Manifest(ctx, image.Path, image.Reference())
+	if err != nil {
+		return err
 	}
 
 	b, err := json.MarshalIndent(manifest, " ", "  ")

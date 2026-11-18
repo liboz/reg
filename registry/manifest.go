@@ -10,7 +10,6 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/manifestlist"
-	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/manifest/schema2"
 )
 
@@ -77,24 +76,6 @@ func (r *Registry) ManifestV2(ctx context.Context, repository, ref string) (sche
 	}
 
 	if m.Versioned.SchemaVersion != 2 {
-		return m, ErrUnexpectedSchemaVersion
-	}
-
-	return m, nil
-}
-
-// ManifestV1 gets the registry v1 manifest.
-func (r *Registry) ManifestV1(ctx context.Context, repository, ref string) (schema1.SignedManifest, error) {
-	uri := r.url("/v2/%s/manifests/%s", repository, ref)
-	r.Logf("registry.manifests uri=%s repository=%s ref=%s", uri, repository, ref)
-
-	var m schema1.SignedManifest
-	if _, err := r.getJSON(ctx, uri, &m); err != nil {
-		r.Logf("registry.manifests response=%v", m)
-		return m, err
-	}
-
-	if m.Versioned.SchemaVersion != 1 {
 		return m, ErrUnexpectedSchemaVersion
 	}
 
